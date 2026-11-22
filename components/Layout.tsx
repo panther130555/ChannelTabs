@@ -8,7 +8,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { React, useRef, useState } from "@webpack/common";
 
 import {
-    addPane, closePane, closeTab, ensureInit, focusPane, moveTab, newTab, selectTab, setSplitRatios, useLayout
+    addPane, closePane, closeTab, ensureInit, focusPane, getState, moveTab, newTab, selectTab, setSplitRatios, useLayout
 } from "../store";
 import Pane, { channelLabel } from "./Pane";
 
@@ -200,6 +200,22 @@ function ChannelAreaInner({ channel, orig }: { channel: any; orig: () => any; })
     const [dropHint, setDropHint] = useState(false);
 
     React.useEffect(() => { ensureInit(channel?.id); }, [channel?.id]);
+
+    // Browser-style Cmd/Ctrl+W: close the active tab instead of letting Discord/Electron close the
+    // whole window. On the last remaining tab we don't intercept, so the native close still works.
+    React.useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+            if (e.key !== "w" && e.key !== "W") return;
+            const { tabs, activeId } = getState();
+            if (tabs.length <= 1) return; // let the default (close window) happen
+            e.preventDefault();
+            e.stopPropagation();
+            closeTab(activeId);
+        };
+        window.addEventListener("keydown", onKey, true);
+        return () => window.removeEventListener("keydown", onKey, true);
+    }, []);
 
     // Capture-phase handlers: the focused pane is native Discord, whose chat area has its own
     // file-upload dropzone that eats drag events before they bubble to us. Capture fires parent->child,
